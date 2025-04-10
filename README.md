@@ -2,9 +2,9 @@
 
 ## Introduction
 
-In today's rapidly evolving cyber threat landscape, timely and automated responses are critical for effective network security. This project integrates several open-source tools into a solid, automated threat detection and response system. It leverages Suricata and Zeek to monitor and log network traffic, with logs being ingested by an ELK (Elasticsearch, Logstash, Kibana) stack for centralized analysis. Using n8n as a workflow automation platform, the system extracts public IP addresses from the ELK logs, cross-references them with external threat intelligence services (VirusTotal and AbuseIPDB), and, if an IP is deemed malicious, automatically enforces a network block via iptables/Firewall.
+In today's rapidly evolving cyber threat landscape, timely and automated responses are critical for effective network security. This project integrates several open-source tools into a solid, automated threat detection and response system. It leverages Suricata and Zeek to monitor and log network traffic, with logs being ingested by an ELK (Elasticsearch, Logstash, Kibana) stack for centralized analysis. Using n8n as a workflow automation platform, the system extracts public IP addresses from the ELK logs, cross-references them with external threat intelligence services (VirusTotal and AbuseIPDB), and if an IP is deemed malicious automatically enforces a network block via iptables/Firewall.
 
-This end-to-end automation minimizes manual intervention, reduces response times, and enhances overall network resilience against cyber-attacks.
+This end-to-end automation minimizes manual intervention, reduces response times and enhances overall network resilience against cyber-attacks.
 
 ## Problem Statement
 
@@ -37,7 +37,7 @@ While advanced SOAR (Security Orchestration, Automation, and Response) tools exi
 - **Threat Intelligence APIs**: VirusTotal and AbuseIPDB
 - **Firewall**: UFW (built-in Ubuntu firewall)
 
-## Expected Outcomes
+## Outcomes
 
 - **Cost-Effective Solution**: Reduces the need for expensive commercial SOAR tools.
 - **Near Real-Time Monitoring and Analysis**: Enables proactive network defense.
