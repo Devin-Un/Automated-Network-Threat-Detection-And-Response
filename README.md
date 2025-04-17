@@ -147,6 +147,28 @@ When threats are detected:
 
 ---
 
+## 📬 Email Alerts
+
+When threats are detected:
+
+- ⚠️ An email is sent to the SOC team with full threat context.
+- 📄 Emails are customized for each type of alert:
+  - **IP Alerts** – contain reputation data and auto-block status
+  - **File Hash Alerts** – include risk classification and lookup results
+
+### 📨 IP Alert Email Example
+
+![IP Alert](./assets/ip_email_alert.png)
+
+---
+
+### 📨 File Hash Alert Email Example
+
+![Hash Alert](./assets/hash_email_alert.png)
+
+
+---
+
 ## 📁 Project Structure
 
 
