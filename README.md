@@ -1,4 +1,4 @@
-# Automated Network Threat Detection and Response
+<!--# Automated Network Threat Detection and Response
 
 ## Introduction
 
@@ -84,7 +84,7 @@ For queries and suggestions, feel free to reach out.
 
 ---
 
-
+-->
 
 # 🛡️ Automated Network Threat Detection & Response (ANTD&R)
 
