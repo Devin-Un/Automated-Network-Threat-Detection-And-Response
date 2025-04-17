@@ -151,7 +151,7 @@ When threats are detected:
 
 When threats are detected:
 
-- ⚠️ An email is sent to the SOC team with full threat context.
+- ⚠️ An email is sent to the SOC team for further Threat Hunting.
 - 📄 Emails are customized for each type of alert:
   - **IP Alerts** – contain reputation data and auto-block status
   - **File Hash Alerts** – include risk classification and lookup results
