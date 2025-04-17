@@ -133,23 +133,6 @@ For queries and suggestions, feel free to reach out.
 ## 📬 Email Alerts
 
 When threats are detected:
-- ⚠️ An email is sent to the SOC team with IPs and Hashes.
-- 📄 Includes categorized risk reports and IP/hash details in a readable HTML format.
-
----
-
-## 📸 Workflow Snapshot
-
-> Here’s what the full `n8n` workflow looks like:
-
-![Workflow](./assets/n8n_workflow.png)
-
-
----
-
-## 📬 Email Alerts
-
-When threats are detected:
 
 - ⚠️ An email is sent to the SOC team for further Threat Hunting.
 - 📄 Emails are customized for each type of alert:
@@ -160,11 +143,18 @@ When threats are detected:
 
 ![IP Alert](./assets/ip_email_alert.png)
 
----
 
 ### 📨 File Hash Alert Email Example
 
 ![Hash Alert](./assets/hash_email_alert.png)
+
+---
+
+## 📸 Workflow Snapshot
+
+> Here’s what the full `n8n` workflow looks like:
+
+![Workflow](./assets/n8n_workflow.png)
 
 
 ---
