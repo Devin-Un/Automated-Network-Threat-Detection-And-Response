@@ -161,7 +161,7 @@ When threats are detected:
 
 ## 📁 Project Structure
 
-
+├── assets/ # Visuals used in the README │ ├── n8n_workflow_screenshot.png │ ├── ip_alert_email.png │ └── hash_alert_email.png │ ├── workflows/ │ └── antdr-workflow.json # Exported n8n workflow file │ ├── README.md # Project documentation └── LICENSE # License file
 
 ### Acknowledgments
 
