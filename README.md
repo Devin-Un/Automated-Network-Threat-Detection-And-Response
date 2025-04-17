@@ -142,7 +142,7 @@ When threats are detected:
 
 > Here’s what the full `n8n` workflow looks like:
 
-![Workflow](assets/Screenshot 2025-04-12 151637.png)
+![Workflow](../assets/Screenshot 2025-04-12 151637.png)
 
 *(Make sure to include your screenshot in the repo’s `assets/` folder and update the path if needed.)*
 
