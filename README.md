@@ -144,7 +144,6 @@ When threats are detected:
 
 ![Workflow](./assets/n8n_workflow.png)
 
-*(Make sure to include your screenshot in the repo’s `assets/` folder and update the path if needed.)*
 
 ---
 
