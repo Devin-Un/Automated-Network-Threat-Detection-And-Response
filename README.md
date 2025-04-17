@@ -84,6 +84,74 @@ For queries and suggestions, feel free to reach out.
 
 ---
 
+
+
+# 🛡️ Automated Network Threat Detection & Response (ANTD&R)
+
+![n8n](https://img.shields.io/badge/built%20with-n8n-brightgreen?logo=n8n)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-Active-success)
+
+## ⚙️ Overview
+
+**Automated Network Threat Detection & Response (ANTD&R)** is an open-source, workflow-driven threat detection and response system powered by [n8n](https://n8n.io/). It integrates threat intelligence services with Elasticsearch logs to automate the detection of malicious IPs and suspicious file hashes—and responds in real-time with alerts and firewall rules.
+
+---
+
+## 🧰 Tech Stack
+
+- **n8n** – Workflow automation
+- **Elasticsearch** – Log storage and querying
+- **Zeek** & **Suricata** – Network security monitoring
+- **VirusTotal API** – File and IP reputation checks
+- **AbuseIPDB** – IP abuse verification
+- **UFW** – IP blocking
+- **Gmail** – Email notifications
+
+---
+
+## 🚀 Features
+
+- ⏱️ **Cron-based execution** for scheduled threat hunting  
+- 📦 **Log ingestion from Elasticsearch**:  
+  - Suspicious file hashes  
+  - Public IP addresses  
+- 🌐 **Threat intelligence lookups** using:
+  - [VirusTotal](https://virustotal.com)  
+  - [AbuseIPDB](https://abuseipdb.com)  
+- 🔐 **Automated remediation**:
+  - IP blocking via UFW
+  - Email alerts with HTML-formatted reports
+- 🧠 **Risk classification** of file hashes:
+  - Low Risk
+  - Suspicious
+  - High Risk
+  - Critical
+
+---
+
+## 📬 Email Alerts
+
+When threats are detected:
+- ⚠️ An email is sent to the SOC team with full threat context.
+- 📄 Includes categorized risk reports and IP/hash details in a readable HTML format.
+
+---
+
+## 📸 Workflow Snapshot
+
+> Here’s what the full `n8n` workflow looks like:
+
+![Workflow](./assets/n8n_workflow_screenshot.png)
+
+*(Make sure to include your screenshot in the repo’s `assets/` folder and update the path if needed.)*
+
+---
+
+## 📁 Project Structure
+
+
+
 ### Acknowledgments
 
 Special thanks to the developers of Suricata, Zeek, ELK Stack, n8n, and the cybersecurity community for their contributions to open-source security solutions.
