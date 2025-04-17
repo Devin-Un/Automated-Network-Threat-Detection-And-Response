@@ -133,7 +133,7 @@ For queries and suggestions, feel free to reach out.
 ## 📬 Email Alerts
 
 When threats are detected:
-- ⚠️ An email is sent to the SOC team with full threat context.
+- ⚠️ An email is sent to the SOC team with IPs and Hashes.
 - 📄 Includes categorized risk reports and IP/hash details in a readable HTML format.
 
 ---
