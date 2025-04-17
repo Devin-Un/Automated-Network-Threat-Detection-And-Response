@@ -112,7 +112,7 @@ For queries and suggestions, feel free to reach out.
 
 ## 🚀 Features
 
-- ⏱️ **Cron-based execution** for scheduled threat hunting  
+- ⏱️ **Cron-based execution** for scheduled threat hunting (Every 2 to 5 min / according needs)  
 - 📦 **Log ingestion from Elasticsearch**:  
   - Suspicious file hashes  
   - Public IP addresses  
