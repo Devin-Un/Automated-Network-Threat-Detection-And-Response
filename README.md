@@ -114,20 +114,20 @@ For queries and suggestions, feel free to reach out.
 
 - ⏱️ **Cron-based execution** for scheduled threat hunting (Every 2 to 5 min / according needs)  
 - 📦 **Log ingestion from Elasticsearch**:  
-  - Suspicious file hashes  
+  - file hashes  
   - Public IP addresses  
 - 🌐 **Threat intelligence lookups** using:
-  - [VirusTotal](https://virustotal.com)  
-  - [AbuseIPDB](https://abuseipdb.com)  
+  - [VirusTotal](https://virustotal.com)  (IP/Hash)
+  - [AbuseIPDB](https://abuseipdb.com)  (IP)
 - 🔐 **Automated remediation**:
-  - IP blocking via UFW
+  - IP blocking via UFW/Firewalls (could be better in Small and Medium size Businesses)
   - Email alerts with HTML-formatted reports
 - 🧠 **Risk classification** of file hashes:
   - Low Risk
   - Suspicious
   - High Risk
   - Critical
-
+- 📬 **Email Alerts**
 ---
 
 ## 📬 Email Alerts
