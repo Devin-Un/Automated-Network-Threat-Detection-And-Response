@@ -159,6 +159,12 @@ When threats are detected:
 
 ---
 
+## 🚀 Demo
+
+![Demo](assets/demo.gif)
+
+
+---
 <!-- ## 📁 Project Structure
 -->
 
