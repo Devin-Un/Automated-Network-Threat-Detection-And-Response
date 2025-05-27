@@ -1,0 +1,1277 @@
+{
+  "name": "Autometed network threat detection and response",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "// Helper function to check if an IP is public\nfunction isPublicIp(ip) {\n  // Check if IP is defined and is a string\n  if (typeof ip !== 'string') return false;\n  \n  // Exclude localhost\n  if (ip === '127.0.0.1' || ip === '::1') return false;\n\n  // Private IP ranges:\n  // 10.0.0.0 - 10.255.255.255\n  // 172.16.0.0 - 172.31.255.255\n  // 192.168.0.0 - 192.168.255.255\n  const parts = ip.split('.').map(Number);\n  if (parts.length !== 4 || parts.some(isNaN)) return false;\n  \n  if (parts[0] === 10) return false;\n  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;\n  if (parts[0] === 192 && parts[1] === 168) return false;\n  \n  return true;\n}\n\nconst ipSet = new Set();\n\nitems.forEach(item => {\n  // Extract source and destination IPs if available\n  const src = item.json.src_ip;\n  const dest = item.json.dest_ip;\n\n  if (src && isPublicIp(src)) {\n    ipSet.add(src);\n  }\n  if (dest && isPublicIp(dest)) {\n    ipSet.add(dest);\n  }\n});\n\nreturn [...ipSet].map(ip => ({ json: { ip } }));"
+      },
+      "id": "4b1debe6-9ae7-4160-a005-b0192b2cf88c",
+      "name": "Deduplicate & Filter Public IPs",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check?ipAddress={{$json.ip}}",
+        "jsonParameters": true,
+        "options": {},
+        "headerParametersJson": "{\n  \"Accept\": \"application/json\",\n  \"Key\": \"your AIP key\"\n}\n",
+        "queryParametersJson": "={\n  \"ipAddress\": \"{{$json.ip}}\",\n  \"maxAgeInDays\": \"90\"\n}"
+      },
+      "id": "dadfc7e1-12c4-4075-acbe-8945c6974690",
+      "name": "AbuseIPDB Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        880,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.total_votes.malicious }}",
+              "operation": "larger"
+            },
+            {
+              "value1": "={{ $json.abuseConfidenceScore }}",
+              "operation": "largerEqual",
+              "value2": 50
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "0acf7f7a-2267-4619-9708-263902d510ce",
+      "name": "Suspicion Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=sudo ufw deny in from {{ $json.ip }} && sudo ufw deny out to {{ $json.ip }}  \n"
+      },
+      "id": "8d114742-4dd7-482a-bd7f-35cfead87bb3",
+      "name": "Block IP",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{$json.ip}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        60
+      ],
+      "id": "a80be813-4c0e-40fe-8064-7ee475c8f27e",
+      "name": "VirusTotal HTTP Request",
+      "extendsCredential": "virusTotalApi",
+      "credentials": {
+        "virusTotalApi": {
+          "id": "5VyWrZxFrF9IAeCJ",
+          "name": "VirusTotal account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"ip\": \"{{$json[\"data\"][\"id\"]}}\",\n  \"total_votes\": {\n  \"harmless\": {{ $json.data.attributes.total_votes.harmless }},\n  \"malicious\": {{ $json.data.attributes.total_votes.malicious }}\n},\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1060,
+        60
+      ],
+      "id": "36b3d523-1422-4cd3-8995-8dbbb560f88c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"ip\": \"{{ $json.data.ipAddress }}\",\n  \"abuseConfidenceScore\": \"{{ $json.data.abuseConfidenceScore }}\"\n\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1060,
+        240
+      ],
+      "id": "1d6ab3dd-8439-43f1-ab87-51dc5b51ba78",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// In a Function node in n8n\nconst filteredItems = items.filter(item => {\n  // Retrieve the file path from the log item\n  const filePath = item.json.log?.file?.path || \"\";\n  \n  // Check if the filePath contains either \"notice.log\" or \"weird.log\"\n  return filePath.includes(\"notice.log\") || filePath.includes(\"weird.log\");\n});\n\n// Return the filtered items for further processing in the workflow\nreturn filteredItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        240
+      ],
+      "id": "02fe1f19-2879-4b9a-8507-af68e0df2080",
+      "name": "Notice.log"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "ip",
+        "joinMode": "=keepNonMatches",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -300,
+        80
+      ],
+      "id": "cc86edce-87f4-4876-9e5b-56e514e84df5",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "ip",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -300,
+        240
+      ],
+      "id": "d34fb7e1-5851-4a3e-b0a1-373f60f16ee0",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -20,
+        160
+      ],
+      "id": "1b718d44-4616-4c0a-83b5-ab3b2c75a164",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "0b3e3c11-8395-48f7-acdb-4de5f2c7c93c",
+      "name": "Merge IP Reputation",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        140
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Helper function to determine if an IP is public (for IPv4)\nfunction isPublicIP(ip) {\n  const parts = ip.split('.');\n  if (parts.length !== 4) return false; // Not a valid IPv4\n  const a = parseInt(parts[0], 10);\n  const b = parseInt(parts[1], 10);\n  \n  // Exclude private IP ranges:\n  if (a === 10) return false; // 10.0.0.0/8\n  if (a === 172 && b >= 16 && b <= 31) return false; // 172.16.0.0/12\n  if (a === 192 && b === 168) return false; // 192.168.0.0/16\n  if (a === 127) return false; // Loopback\n  \n  return true;\n}\n\nconst seenIPs = new Set();\nconst uniqueResults = [];\n\nfor (const item of items) {\n  // Only process logs coming from weird.log or notice.log\n  const filePath = item.json.log?.file?.path || \"\";\n  if (!(filePath.includes(\"weird.log\") || filePath.includes(\"notice.log\"))) {\n    continue;\n  }\n  \n  try {\n    // Parse the \"message\" field which contains log details as a JSON string\n    const messageObj = JSON.parse(item.json.message);\n    \n    // Extract IPs from desired fields (you may adjust these field names as needed)\n    const ipFields = [messageObj[\"id.orig_h\"], messageObj[\"id.resp_h\"]];\n    \n    // Loop over each IP field and add unique public IPs\n    for (const ip of ipFields) {\n      if (ip && isPublicIP(ip) && !seenIPs.has(ip)) {\n        seenIPs.add(ip);\n        uniqueResults.push({ json: { ip } });\n      }\n    }\n    \n  } catch (error) {\n    // Skip items where JSON parsing fails\n    continue;\n  }\n}\n\nreturn uniqueResults;\n"
+      },
+      "id": "0492a64f-7958-4ef1-b976-af3633339cab",
+      "name": "extracting ip",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -540,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\n\nconst uniqueItems = items.map(item => {\n    const logMessage = item.json.message;\n    const parsedMessage = JSON.parse(logMessage);\n\n    const hashKey = `${parsedMessage.md5}|${parsedMessage.sha1}|${parsedMessage.sha256}`;\n    \n    if (!seen.has(hashKey)) {\n        seen.add(hashKey);\n        return {\n            json: {\n                md5: parsedMessage.md5,\n                sha1: parsedMessage.sha1,\n                sha256: parsedMessage.sha256\n            }\n        };\n    }\n\n    return null; // skip duplicates\n}).filter(item => item !== null); // remove nulls\n\nreturn uniqueItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        640
+      ],
+      "id": "c8def3d5-3a2d-4681-8c60-9207eafe3dce",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/files/{{ $json.sha256 }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "your  API"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        640
+      ],
+      "id": "3be87982-639d-4f8b-8e61-bc41896ae66b",
+      "name": "VirusTotal HTTP Request1",
+      "extendsCredential": "virusTotalApi",
+      "alwaysOutputData": true,
+      "credentials": {
+        "virusTotalApi": {
+          "id": "5VyWrZxFrF9IAeCJ",
+          "name": "VirusTotal account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"id\": \"{{$json.data.id}}\",\n  \"file-type\": \"{{ $json.data.type }}-{{ $json.data.attributes.type_description }}\",\n  \"sha256\": \"{{$json.data.attributes.sha256}}\",\n  \"authentihash\": \"{{$json.data.attributes.authentihash}}\",\n  \"meaningful_name\": \"{{$json.data.attributes.meaningful_name}}\",\n  \"malicious_votes\": \"{{$json.data.attributes.total_votes.malicious}}\",\n  \"harmless_votes\": \"{{$json.data.attributes.total_votes.harmless}}\",\n  \"times_submitted\": \"{{$json.data.attributes.times_submitted}}\",\n  \"last_analysis_date\": \"{{$json.data.attributes.last_analysis_date}}\",\n  \"last_modification_date\": \"{{$json.data.attributes.last_modification_date}}\",\n  \"unique_sources\": \"{{$json.data.attributes.unique_sources}}\"\n}",
+        "options": {
+          "dotNotation": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        640
+      ],
+      "id": "2c3eb6a6-fa45-470b-be06-7689f76c0735",
+      "name": "Edit Fields2",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "21c7fd09-64c3-45fc-8700-57296ac91f00",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "undefined",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "ec286713-fa4f-4122-a550-c51b64b07139",
+              "leftValue": "={{ $json.sha256 }}",
+              "rightValue": "undefined",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -20,
+        640
+      ],
+      "id": "757a2621-e4f6-454a-b875-c7ec26b6641e",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.malicious_votes }}",
+                    "rightValue": "^(?:[0-3])$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "=Low Risk"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1223b104-2500-4411-8567-fc7f672fcbab",
+                    "leftValue": "={{ $json.malicious_votes }}",
+                    "rightValue": "^(?:[4-9]|10)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Suspicious"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "58c0772b-77d2-4a4e-9995-0c1fff0860ae",
+                    "leftValue": "={{ $json.malicious_votes }}",
+                    "rightValue": "^(?:1[1-9])$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "High Risk"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6c66f1d3-4def-4050-9b28-76dd7170c8b6",
+                    "leftValue": "={{ $json.malicious_votes }}",
+                    "rightValue": "^(?:2\\d+|[3-9]\\d+)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Critical Risk"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "allMatchingOutputs": true
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        200,
+        640
+      ],
+      "id": "411b044f-22b1-4396-ab1b-8b8d43e0f9c3",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "your email",
+        "subject": "IP blocked!!",
+        "message": "=Malicious IP Found!!!  {{ $json.htmlTable }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        120
+      ],
+      "id": "08614e80-a450-467a-88b7-96244c00f6f2",
+      "name": "Send IP mail",
+      "webhookId": "1675db2b-3f1d-46f1-9908-62b5d41690d8",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "m64u4FOqv5jKU9oZ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let ips = items.map(item => item.json.ip);\n\nlet htmlTable = `\n<table border=\"1\" style=\"border-collapse: collapse; width: 100%;\">\n    <tr>\n        <th style=\"padding: 8px; background-color: #f2f2f2;\">Blocked IPs</th>\n    </tr>\n    ${ips.map(ip => `<tr><td style=\"padding: 8px;\">${ip}</td></tr>`).join(\"\")}\n</table>\n`;\n\nreturn [{\n    json: { htmlTable }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        120
+      ],
+      "id": "6c38b6c9-8d39-420b-bae6-5482ddf9f128",
+      "name": "IP HTML table"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 4,
+        "options": {
+          "includeUnpaired": true
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        820,
+        620
+      ],
+      "id": "3b756982-2870-4f32-b31e-00fadeaa5fbd",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fc2af31-1a2f-42d1-b18f-4e35ab75006f",
+              "name": "type",
+              "value": "Critical",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        920
+      ],
+      "id": "35f7c2ca-f540-4d38-9718-6a03606014d1",
+      "name": "edit critical",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fc2af31-1a2f-42d1-b18f-4e35ab75006f",
+              "name": "type",
+              "value": "High Risk",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        760
+      ],
+      "id": "3e219fe7-e897-4e19-b578-e9d842c10c7a",
+      "name": "Edit high risk",
+      "executeOnce": false,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fc2af31-1a2f-42d1-b18f-4e35ab75006f",
+              "name": "type",
+              "value": "Suspicious",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        600
+      ],
+      "id": "638421a9-f5a3-4cee-b407-72a2b00c3413",
+      "name": "Edit suspicious",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fc2af31-1a2f-42d1-b18f-4e35ab75006f",
+              "name": "type",
+              "value": "Low Risk",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        440
+      ],
+      "id": "4976eb47-d062-4051-963c-5d08a8c28d0e",
+      "name": "Edit low risk",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sendTo": "your email@gmail.com",
+        "subject": "Known Malware Hashes Detected!!!",
+        "message": "={{ $json.emailBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1480,
+        640
+      ],
+      "id": "b5af4519-c46e-406f-8883-9ce88ebcb80e",
+      "name": "Send hash mail",
+      "webhookId": "f0e0b1ba-c31e-4787-8b17-711cc8be01ad",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "m64u4FOqv5jKU9oZ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "indexId": "filebeat-*",
+        "limit": 10000,
+        "options": {
+          "query": "{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"range\": {\n            \"@timestamp\": {\n              \"gte\": \"now-3m\",\n              \"lte\": \"now\"\n            }\n          }\n        }\n      ],\n      \"should\": [\n        {\n          \"bool\": {\n            \"must\": [\n              { \"exists\": { \"field\": \"src_ip\" } },\n              {\n                \"bool\": {\n                  \"must_not\": [\n                    {\n                      \"range\": {\n                        \"src_ip\": {\n                          \"gte\": \"10.0.0.0\",\n                          \"lte\": \"10.255.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"src_ip\": {\n                          \"gte\": \"172.16.0.0\",\n                          \"lte\": \"172.31.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"src_ip\": {\n                          \"gte\": \"192.168.0.0\",\n                          \"lte\": \"192.168.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"term\": {\n                        \"src_ip\": \"127.0.0.1\"\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"src_ip\": {\n                          \"gte\": \"169.254.0.0\",\n                          \"lte\": \"169.254.255.255\"\n                        }\n                      }\n                    }\n                  ]\n                }\n              }\n            ]\n          }\n        },\n        {\n          \"bool\": {\n            \"must\": [\n              { \"exists\": { \"field\": \"dest_ip\" } },\n              {\n                \"bool\": {\n                  \"must_not\": [\n                    {\n                      \"range\": {\n                        \"dest_ip\": {\n                          \"gte\": \"10.0.0.0\",\n                          \"lte\": \"10.255.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"dest_ip\": {\n                          \"gte\": \"172.16.0.0\",\n                          \"lte\": \"172.31.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"dest_ip\": {\n                          \"gte\": \"192.168.0.0\",\n                          \"lte\": \"192.168.255.255\"\n                        }\n                      }\n                    },\n                    {\n                      \"term\": {\n                        \"dest_ip\": \"127.0.0.1\"\n                      }\n                    },\n                    {\n                      \"range\": {\n                        \"dest_ip\": {\n                          \"gte\": \"169.254.0.0\",\n                          \"lte\": \"169.254.255.255\"\n                        }\n                      }\n                    }\n                  ]\n                }\n              }\n            ]\n          }\n        }\n      ],\n      \"minimum_should_match\": 1\n    }\n  }\n}\n"
+        }
+      },
+      "id": "e491d50a-86d5-4381-8faf-41f9d0d2617a",
+      "name": "Suricata logs",
+      "type": "n8n-nodes-base.elasticsearch",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        60
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "elasticsearchApi": {
+          "id": "Tzy4RH7yNP6VODAY",
+          "name": "Elasticsearch account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "indexId": "filebeat-*",
+        "limit": 10000,
+        "options": {
+          "query": "={\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"range\": {\n            \"@timestamp\": {\n              \"gte\": \"now-3m\",\n              \"lte\": \"now\"\n            }\n          }\n        }\n      ],\n      \"must_not\": [\n        {\n          \"term\": {\n            \"log.file.path\": \"/var/log/suricata/eve.json\"\n          }\n        }\n      ]\n    }\n  }\n}\n"
+        }
+      },
+      "id": "126316e1-b4b2-4c88-a3b0-a62773821237",
+      "name": "Zeek logs",
+      "type": "n8n-nodes-base.elasticsearch",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        240
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "indexId": "filebeat-*",
+        "limit": 10000,
+        "options": {
+          "query": "={\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"range\": {\n            \"@timestamp\": {\n              \"gte\": \"now-10m\",\n              \"lte\": \"now\"\n            }\n          }\n        },\n        {\n          \"term\": {\n            \"log.file.path\": \"/opt/zeek/logs/current/files.log\"\n          }\n        }\n      ]\n    }\n  }\n}\n\n"
+        }
+      },
+      "id": "c7050614-4f4d-4940-947e-e9b3a1750178",
+      "name": "Zeek files.logs",
+      "type": "n8n-nodes-base.elasticsearch",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        640
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6327c940-0dfe-482d-9228-15518e560d54",
+              "leftValue": "={{ $json.stdout }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        580,
+        160
+      ],
+      "id": "49f19837-4994-408e-92c7-00e1f9c27f21",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "52725a63-8734-4820-9903-9db68a9e0c12",
+              "name": "ip",
+              "value": "={{ $('Merge3').item.json.ip }}",
+              "type": "string"
+            },
+            {
+              "id": "5ce0bce1-8705-433c-aba9-0e268a01325c",
+              "name": "stdout",
+              "value": "={{ $json.stdout }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        380,
+        160
+      ],
+      "id": "729ea204-9408-429a-9814-46f15e990de0",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=sudo ufw status | grep {{$json[\"ip\"]}} || true\n"
+      },
+      "id": "3b12e9d7-570e-4015-9f9e-7975dd93def2",
+      "name": "Check Blocked IP",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        180,
+        160
+      ],
+      "executeOnce": false,
+      "notesInFlow": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1300,
+        380
+      ],
+      "id": "8468e6e0-5d2e-4320-9683-a47943526b48",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/user/Desktop/n8n/CleanIPs.json",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        320
+      ],
+      "id": "5a8d8f61-f742-4abb-9268-cefc0ad4c4fe",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jsonData = items.map(item => item.json); // <- all your data\nconst jsonString = JSON.stringify(jsonData, null, 2);\nconst bufferData = Buffer.from(jsonString, 'utf8');\n\nreturn [\n  {\n    binary: {\n      data: {\n        data: bufferData.toString('base64'), // Important: base64 encode\n        mimeType: 'application/json',\n        fileName: 'CleanIPs.json',\n      }\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        320
+      ],
+      "id": "1b10271d-96d8-4157-8628-70a54bcf6213",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      emailBody: `\n        <html>\n        <head>\n          <style>\n            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }\n            .container { max-width: 800px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); }\n            h3 { color: #333; text-align: center; }\n            table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 2px solid black; }\n            th, td { padding: 12px; text-align: center; border: 1px solid black; }\n            th { background: #004085; color: #fff; font-size: 14px; text-transform: uppercase; }\n            tr:nth-child(even) { background: #f9f9f9; }\n            .risk { font-weight: bold; padding: 8px 12px; border-radius: 6px; }\n            .low { background: #d4edda; color: #155724; }\n            .suspicious { background: #fff3cd; color: #856404; }\n            .high { background: #f8d7da; color: #721c24; }\n            .critical { background: #fb0000; color: #fff; }\n          </style>\n        </head>\n        <body>\n          <div class=\"container\">\n            <h3>🛑 Detected Malicious Hashes</h3>\n            <table>\n              <tr>\n                <th>SHA256</th>\n                <th>File Type</th>\n                <th>Meaningful Name</th>\n                <th>Malicious Votes</th>\n                <th>Harmless Votes</th>\n                <th>Risk Level</th>\n              </tr>\n              ${items.map(item => `\n                <tr>\n                  <td>${item.json.sha256}</td>\n                  <td>${item.json[\"file-type\"]}</td>\n                  <td>${item.json.meaningful_name}</td>\n                  <td>${item.json.malicious_votes}</td>\n                  <td>${item.json.harmless_votes}</td>\n                  <td class=\"risk ${getRiskClass(item.json.type)}\">${item.json.type}</td>\n                </tr>\n              `).join('')}\n            </table>\n          </div>\n        </body>\n        </html>\n      `\n    }\n  }\n];\n\nfunction getRiskClass(type) {\n  const classes = {\n    \"Low\": \"low\",\n    \"Suspicious\": \"suspicious\",\n    \"High\": \"high\",\n    \"Critical\": \"critical\"\n  };\n  return classes[type] || \"\";\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        640
+      ],
+      "id": "6bcec79d-77f7-4a96-af69-169e63812974",
+      "name": "html for email"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items\n  .map(item => item.json) // extract the json data\n  .filter(obj => Object.keys(obj).length > 0) // remove empty {}\n  .map(obj => ({ json: obj })); // wrap back in n8n format\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        640
+      ],
+      "id": "e1d06ea1-6622-4570-ab05-cc64f6559b55",
+      "name": "Code2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Deduplicate & Filter Public IPs": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AbuseIPDB Check": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suspicion Check": {
+      "main": [
+        [
+          {
+            "node": "Block IP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IP HTML table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge IP Reputation",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge IP Reputation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block IP": {
+      "main": [
+        []
+      ]
+    },
+    "Notice.log": {
+      "main": [
+        [
+          {
+            "node": "extracting ip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "Check Blocked IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge IP Reputation": {
+      "main": [
+        [
+          {
+            "node": "Suspicion Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extracting ip": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit low risk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit suspicious",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit high risk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "edit critical",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "IP HTML table": {
+      "main": [
+        [
+          {
+            "node": "Send IP mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "edit critical": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Edit high risk": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Edit suspicious": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Edit low risk": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suricata logs": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate & Filter Public IPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeek logs": {
+      "main": [
+        [
+          {
+            "node": "Notice.log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeek files.logs": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AbuseIPDB Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Blocked IP": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Suricata logs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Zeek logs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Zeek files.logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "html for email": {
+      "main": [
+        [
+          {
+            "node": "Send hash mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "html for email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "38d1c87d-368b-43da-b315-558f63ec7e6c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "327ac4e178a49f30b7ee5ff18280fc7be502d7135b0872f22bddcb10b931a1d2"
+  },
+  "id": "CVnWOF4bFGfBKQ55",
+  "tags": []
+}
